@@ -173,27 +173,32 @@ model{
 }'
 
 # Run the model in jags
-model=jags.model(textConnection(modelstring), data=data, inits=init,n.chains=4)
-update(model,n.iter=10000) # Burnin period
-output=coda.samples(model=model,
-                    variable.names=c("theta",
-                                     "extra_T7",
-                                     "extra_T6",
-                                     "extra_T1_1",
-                                     "extra_T1_2"), 
-                    n.iter=1e7, 
-                    thin=5e3)
-save(output,file='output_20150624.rda')
-#load('output_20150624.rda')
+set.seed(111) # Set the seed for repeatable results
+# model=jags.model(textConnection(modelstring), data=data, inits=init,n.chains=4)
+# update(model,n.iter=1e6) # Burnin period
+# output=coda.samples(model=model,
+#                     variable.names=c("theta",
+#                                      "extra_T7",
+#                                      "extra_T6",
+#                                      "extra_T1_1",
+#                                      "extra_T1_2"), 
+#                     n.iter=1e6, 
+#                     thin=5e2)
+# save(output,file='output_20150624.rda')
+load('output_20150624.rda')
+pdf(file='trace_plot_20150624.pdf',width=8,height=8)
 par(mar=c(2,2,2,2))
 plot(output)
+dev.off()
 summary(output)
+
+# Congergence diagnostics - all good
+gelman.diag(output)
 
 ##########################################################################################
 
-## Extract the parameters - burnin needs to be after about 400,000
-## Equivalent to the 800th iteration
-output_2 = rbind(output[[1]][800:2000,],output[[2]][800:2000,],output[[3]][800:2000,],output[[4]][800:2000,])
+## Extract the parameters
+output_2 = do.call(rbind,output)
 
 # Now create upper and lower CIs
 CIs = t(round(apply(output_2,2,'quantile',c(0.025,0.5,0.975)),0))
@@ -207,13 +212,13 @@ df_1 = data.frame(Tsunami,CIs=CIs[4+c(1:9,11:12,14),])
 rownames(df_1)=NULL
 colnames(df_1)=c('Tsunami','pc2.5','pc50','pc97.5')
   
-ggplot(df_1,aes(x=pc50,y=Tsunami,colour=Tsunami))+ geom_point(size=2) + geom_errorbarh(aes(xmax = pc97.5, xmin =pc2.5),height=0.5)+theme_bw()+theme(legend.position='None',axis.title.y=element_text(angle=0,vjust=1,hjust=0))+ggtitle('Age of Tsunamis with 95% error bounds\n')+xlab('Age (thousands of years')+ scale_x_continuous(breaks=seq(2500,7600,by=500),limits=c(2500,7600))
+#ggplot(df_1,aes(x=pc50,y=Tsunami,colour=Tsunami))+ geom_point(size=2) + geom_errorbarh(aes(xmax = pc97.5, xmin =pc2.5),height=0.5)+theme_bw()+theme(legend.position='None',axis.title.y=element_text(angle=0,vjust=1,hjust=0))+ggtitle('Age of Tsunamis with 95% error bounds\n')+xlab('Age (thousands of years')+ scale_x_continuous(breaks=seq(2500,7600,by=500),limits=c(2500,7600))
 
 ##########################################################################################
 
 # An alternative version - plot densities but facet by Tsunami
 output_3 = c(output_2[,'theta[1]'],output_2[,'theta[2]'],output_2[,'theta[3]'],output_2[,'theta[4]'],output_2[,'theta[5]'],output_2[,'theta[6]'],output_2[,'theta[7]'],output_2[,'theta[8]'],output_2[,'theta[9]'],output_2[,'theta[11]'],output_2[,'theta[12]'],output_2[,'theta[14]'])
-Tsunami = rep(factor(paste('T',12:1,sep=''),levels=paste('T',12:1,sep='')),each=4804)
+Tsunami = rep(factor(paste('T',12:1,sep=''),levels=paste('T',12:1,sep='')),each=4*2000) # num_chains*num_iterations
 df_2 = data.frame(Tsunami=Tsunami,Age=output_3)
 
 ggplot(df_2,aes(x=Age,fill=Tsunami))+ geom_density(colour=NA) + facet_grid(Tsunami ~ .,scales='free')+ theme_bw()+theme(legend.position='None',axis.title.y=element_text(angle=0,vjust=1,hjust=0),axis.text.y = element_blank(),axis.ticks.y = element_blank())+ggtitle('Age of tsunamis\n')+xlab('Age (years BP)')+ scale_x_continuous(breaks=seq(7500,2500,by=-500),limits=c(2500,7600))+ylab("")+coord_trans(x="reverse", y="reverse")+theme(strip.text.y = element_text(size = 8, angle = 0),panel.grid.major.y = element_blank(),panel.grid.minor.y = element_blank())
@@ -234,11 +239,11 @@ colnames(output_4) = paste('T',12:1,sep='')
 output_diff = t(apply(output_4,1,'diff'))
 colnames(output_diff) = c('T11_12','T10_11','T9_10','T8_9','T7_8','T6_7','T5_6','T4_5','T3_4','T2_3','T1_2')
 output_diff_2 = as.vector(output_diff)
-Tsunami = rep(factor(c('T11_12','T10_11','T9_10','T8_9','T7_8','T6_7','T5_6','T4_5','T3_4','T2_3','T1_2'),c('T11_12','T10_11','T9_10','T8_9','T7_8','T6_7','T5_6','T4_5','T3_4','T2_3','T1_2')),each=4804)
+Tsunami = rep(factor(c('T11_12','T10_11','T9_10','T8_9','T7_8','T6_7','T5_6','T4_5','T3_4','T2_3','T1_2'),c('T11_12','T10_11','T9_10','T8_9','T7_8','T6_7','T5_6','T4_5','T3_4','T2_3','T1_2')),each=4*2000)
 df_3 = data.frame(Tsunami=Tsunami,Age=output_diff_2)
 ggplot(df_3,aes(x=Age,fill=Tsunami))+ geom_density(colour=NA) + facet_grid(Tsunami ~ .,scales='free')+ theme_bw() +theme(legend.position='None',axis.title.y=element_text(angle=0,vjust=1,hjust=0),axis.text.y = element_blank(),axis.ticks.y = element_blank())+ggtitle('Age gaps between consecutive tsunamis\n')+xlab('Age gap') + scale_x_continuous(breaks=seq(0,2600,by=200),limits=c(0,2500))+ylab("")+theme(strip.text.y = element_text(size = 8, angle = 0),panel.grid.major.y = element_blank(),panel.grid.minor.y = element_blank())
 ggsave('Tsunami_fig2_20150624.pdf',height=8,width=8)
 
-# Create a csv file of age gas for Ben
+# Create a csv file of age gaps
 CIs_3 = t(round(apply(output_diff,2,'quantile',c(0.01,0.025,0.05,0.25,0.5,0.75,0.95,0.975,0.99)),0))
 write.csv(CIs_3,file='Tsunami_age_gaps_20150624.csv',quote=FALSE)
